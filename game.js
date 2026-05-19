@@ -4,11 +4,11 @@ const CTX = CANVAS.getContext('2d');
 
 // Level configurations
 const LEVEL_CONFIGS = {
-    1: { speed: 2.5, minGap: 140, maxGap: 180, gravity: 0.5, obstacleCount: 5, platformY: 650 },
-    2: { speed: 3.2, minGap: 130, maxGap: 170, gravity: 0.55, obstacleCount: 6, platformY: 650 },
-    3: { speed: 3.9, minGap: 120, maxGap: 160, gravity: 0.6, obstacleCount: 7, platformY: 650 },
-    4: { speed: 4.6, minGap: 110, maxGap: 150, gravity: 0.65, obstacleCount: 8, platformY: 650 },
-    5: { speed: 5.3, minGap: 100, maxGap: 140, gravity: 0.7, obstacleCount: 9, platformY: 650 }
+    1: { speed: 2.5, minGap: 140, maxGap: 180, gravity: 0.5, platformY: 650 },
+    2: { speed: 3.2, minGap: 130, maxGap: 170, gravity: 0.55, platformY: 650 },
+    3: { speed: 3.9, minGap: 120, maxGap: 160, gravity: 0.6, platformY: 650 },
+    4: { speed: 4.6, minGap: 110, maxGap: 150, gravity: 0.65, platformY: 650 },
+    5: { speed: 5.3, minGap: 100, maxGap: 140, gravity: 0.7, platformY: 650 }
 };
 
 // Game state
@@ -27,7 +27,7 @@ const GAME = {
 CANVAS.width = GAME.width;
 CANVAS.height = GAME.height;
 
-// Platform object - MUST be defined before PLAYER
+// Platform object
 const PLATFORM = {
     x: GAME.width / 2 - 60,
     y: 650,
@@ -53,6 +53,7 @@ const PLAYER = {
 
 // Obstacles array
 let obstacles = [];
+let platforms = [];
 const OBSTACLE_CONFIG = {
     width: 80,
     spacing: 300,
@@ -61,6 +62,7 @@ const OBSTACLE_CONFIG = {
 
 // Particle system
 let particles = [];
+let obstaclesPassed = 0;
 
 // ==================== PARTICLE SYSTEM ====================
 class Particle {
@@ -104,6 +106,17 @@ function createParticles(x, y, color, count = 8) {
     }
 }
 
+// ==================== PLATFORM MANAGEMENT ====================
+function generatePlatform(xPosition) {
+    return {
+        x: xPosition,
+        y: 400 + Math.random() * 150,
+        width: 120,
+        height: 20,
+        color: '#00CC00'
+    };
+}
+
 // ==================== OBSTACLE MANAGEMENT ====================
 function generateObstacle(startX) {
     const minGap = GAME.levelConfig.minGap;
@@ -124,8 +137,18 @@ function generateObstacle(startX) {
 
 function initializeObstacles() {
     obstacles = [];
-    for (let i = 0; i < GAME.levelConfig.obstacleCount; i++) {
+    platforms = [];
+    obstaclesPassed = 0;
+    
+    // Create obstacles and platforms
+    for (let i = 0; i < 15; i++) {
         obstacles.push(generateObstacle(GAME.width + i * OBSTACLE_CONFIG.spacing));
+        
+        // Add platform after every 5 obstacles
+        if ((i + 1) % 5 === 0) {
+            const platformX = GAME.width + i * OBSTACLE_CONFIG.spacing + 200;
+            platforms.push(generatePlatform(platformX));
+        }
     }
 }
 
@@ -190,7 +213,7 @@ function drawGround() {
     }
 }
 
-function drawPlatform() {
+function drawStartPlatform() {
     // Shadow
     CTX.fillStyle = 'rgba(0, 0, 0, 0.2)';
     CTX.fillRect(PLATFORM.x - 5, PLATFORM.y + PLATFORM.height + 3, PLATFORM.width + 10, 8);
@@ -213,6 +236,39 @@ function drawPlatform() {
     CTX.strokeStyle = 'rgba(255, 255, 255, 0.5)';
     CTX.lineWidth = 1;
     CTX.strokeRect(PLATFORM.x + 2, PLATFORM.y + 2, PLATFORM.width - 4, PLATFORM.height - 4);
+}
+
+function drawPlatforms() {
+    platforms.forEach((platform) => {
+        // Shadow
+        CTX.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        CTX.fillRect(platform.x - 5, platform.y + platform.height + 3, platform.width + 10, 8);
+
+        // Main platform with blue gradient (checkpoint)
+        const gradient = CTX.createLinearGradient(platform.x, platform.y, platform.x, platform.y + platform.height);
+        gradient.addColorStop(0, '#00DDFF');
+        gradient.addColorStop(0.5, '#00AADD');
+        gradient.addColorStop(1, '#0088BB');
+        
+        CTX.fillStyle = gradient;
+        CTX.fillRect(platform.x, platform.y, platform.width, platform.height);
+        
+        // Border
+        CTX.strokeStyle = '#0066AA';
+        CTX.lineWidth = 3;
+        CTX.strokeRect(platform.x, platform.y, platform.width, platform.height);
+
+        // Highlight
+        CTX.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+        CTX.lineWidth = 1;
+        CTX.strokeRect(platform.x + 2, platform.y + 2, platform.width - 4, platform.height - 4);
+
+        // Checkpoint label
+        CTX.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        CTX.font = 'bold 12px Arial';
+        CTX.textAlign = 'center';
+        CTX.fillText('CHECKPOINT', platform.x + platform.width / 2, platform.y + platform.height + 16);
+    });
 }
 
 function drawPlayer() {
@@ -331,13 +387,12 @@ function updatePlayer() {
         PLAYER.isJumping = false;
     }
 
-    // Platform collision - check if ball is falling onto platform
+    // Start platform collision
     if (PLAYER.velocityY >= 0 && !GAME.isRunning) {
         const playerBottom = PLAYER.y + PLAYER.height;
         const platformTop = PLATFORM.y;
         const playerCenterX = PLAYER.x + PLAYER.width / 2;
         
-        // Check if player is above platform and falling down onto it
         if (playerBottom >= platformTop && playerBottom <= platformTop + 15 &&
             playerCenterX > PLATFORM.x - 20 && playerCenterX < PLATFORM.x + PLATFORM.width + 20) {
             PLAYER.y = PLATFORM.y - PLAYER.height;
@@ -345,6 +400,26 @@ function updatePlayer() {
             PLAYER.isOnPlatform = true;
         }
     }
+
+    // Checkpoint platforms collision
+    platforms.forEach((platform) => {
+        if (PLAYER.velocityY >= 0) {
+            const playerBottom = PLAYER.y + PLAYER.height;
+            const platformTop = platform.y;
+            const playerCenterX = PLAYER.x + PLAYER.width / 2;
+            
+            if (playerBottom >= platformTop && playerBottom <= platformTop + 15 &&
+                playerCenterX > platform.x - 20 && playerCenterX < platform.x + platform.width + 20) {
+                PLAYER.y = platform.y - PLAYER.height;
+                PLAYER.velocityY = 0;
+                PLAYER.isOnPlatform = true;
+                createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y, '#00DDFF', 15);
+                if (navigator.vibrate) {
+                    navigator.vibrate([30, 20, 30]);
+                }
+            }
+        }
+    });
 
     // Ground collision
     if (PLAYER.y + PLAYER.height >= GAME.height - 40) {
@@ -366,13 +441,14 @@ function updateObstacles() {
         if (obstacle.x + OBSTACLE_CONFIG.width < 0) {
             const lastObstacle = obstacles[obstacles.length - 1];
             const newObstacle = generateObstacle(lastObstacle.x + OBSTACLE_CONFIG.spacing);
-            obstacles.shift();
             obstacles.push(newObstacle);
+            obstacles.shift();
         }
 
         if (!obstacle.passed && obstacle.x + OBSTACLE_CONFIG.width < PLAYER.x) {
             obstacle.passed = true;
             GAME.score++;
+            obstaclesPassed++;
             updateScore();
             createParticles(GAME.width / 2, 50, '#00FF00', 15);
             
@@ -381,6 +457,10 @@ function updateObstacles() {
             }
         }
     });
+}
+
+function updatePlatforms() {
+    platforms = platforms.filter(p => p.x > -150);
 }
 
 function updateParticles() {
@@ -455,7 +535,6 @@ window.goToMenu = function() {
 function startNewLevel() {
     GAME.levelConfig = LEVEL_CONFIGS[GAME.currentLevel];
     PLAYER.gravity = GAME.levelConfig.gravity;
-    PLATFORM.y = GAME.levelConfig.platformY;
     
     GAME.score = 0;
     GAME.isRunning = false;
@@ -466,6 +545,7 @@ function startNewLevel() {
     PLAYER.isJumping = false;
     
     obstacles = [];
+    platforms = [];
     particles = [];
     
     initializeObstacles();
@@ -484,12 +564,14 @@ function startGame() {
 function gameLoop() {
     drawBackground();
     drawGround();
-    drawPlatform();
+    drawStartPlatform();
+    drawPlatforms();
 
     if (GAME.gameActive) {
         updatePlayer();
         if (GAME.isRunning) {
             updateObstacles();
+            updatePlatforms();
             checkCollisions();
         }
     }
