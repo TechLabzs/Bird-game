@@ -2,13 +2,25 @@
 const CANVAS = document.getElementById('gameCanvas');
 const CTX = CANVAS.getContext('2d');
 
+// Level configurations
+const LEVEL_CONFIGS = {
+    1: { speed: 2.5, minGap: 140, maxGap: 180, gravity: 0.5, obstacleCount: 5, platformY: 700 },
+    2: { speed: 3.2, minGap: 130, maxGap: 170, gravity: 0.55, obstacleCount: 6, platformY: 680 },
+    3: { speed: 3.9, minGap: 120, maxGap: 160, gravity: 0.6, obstacleCount: 7, platformY: 660 },
+    4: { speed: 4.6, minGap: 110, maxGap: 150, gravity: 0.65, obstacleCount: 8, platformY: 640 },
+    5: { speed: 5.3, minGap: 100, maxGap: 140, gravity: 0.7, obstacleCount: 9, platformY: 620 }
+};
+
 // Game state
 const GAME = {
     width: CANVAS.offsetWidth || 600,
     height: CANVAS.offsetHeight || 800,
-    isRunning: true,
+    isRunning: false,
+    gameActive: false,
     score: 0,
-    bestScore: localStorage.getItem('bestScore') || 0
+    bestScore: localStorage.getItem('bestScore') || 0,
+    currentLevel: 1,
+    levelConfig: LEVEL_CONFIGS[1]
 };
 
 // Set canvas size
@@ -26,17 +38,24 @@ const PLAYER = {
     jumpPower: -12,
     color: '#FFD700',
     eyeColor: '#333',
-    isJumping: false
+    isJumping: false,
+    isOnPlatform: false
+};
+
+// Platform object
+const PLATFORM = {
+    x: GAME.width / 2 - 60,
+    y: 700,
+    width: 120,
+    height: 15,
+    color: '#00CC00'
 };
 
 // Obstacles array
 let obstacles = [];
 const OBSTACLE_CONFIG = {
     width: 80,
-    minGap: 120,
-    maxGap: 160,
     spacing: 300,
-    speed: 3,
     color: '#FF4444'
 };
 
@@ -59,7 +78,7 @@ class Particle {
     update() {
         this.x += this.vx;
         this.y += this.vy;
-        this.vy += 0.3; // gravity
+        this.vy += 0.3;
         this.life--;
     }
 
@@ -87,9 +106,10 @@ function createParticles(x, y, color, count = 8) {
 
 // ==================== OBSTACLE MANAGEMENT ====================
 function generateObstacle(startX) {
-    const gapSize = OBSTACLE_CONFIG.minGap + 
-                    Math.random() * (OBSTACLE_CONFIG.maxGap - OBSTACLE_CONFIG.minGap);
-    const topHeight = Math.random() * (GAME.height - gapSize - 100) + 50;
+    const minGap = GAME.levelConfig.minGap;
+    const maxGap = GAME.levelConfig.maxGap;
+    const gapSize = minGap + Math.random() * (maxGap - minGap);
+    const topHeight = Math.random() * (GAME.height - gapSize - 120) + 80;
     const bottomY = topHeight + gapSize;
 
     return {
@@ -98,52 +118,49 @@ function generateObstacle(startX) {
         bottomY: bottomY,
         gapSize: gapSize,
         passed: false,
-        topColor: '#FF4444',
-        bottomColor: '#FF2222',
         rotation: 0
     };
 }
 
 function initializeObstacles() {
     obstacles = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < GAME.levelConfig.obstacleCount; i++) {
         obstacles.push(generateObstacle(GAME.width + i * OBSTACLE_CONFIG.spacing));
     }
 }
 
 // ==================== INPUT HANDLING ====================
 function handleJump(e) {
-    if (!GAME.isRunning) return;
+    if (!GAME.gameActive) return;
+    if (!GAME.isRunning && !PLAYER.isOnPlatform) return;
     
-    // Prevent default touch behavior
     if (e.type.includes('touch')) {
         e.preventDefault();
     }
 
     PLAYER.velocityY = PLAYER.jumpPower;
     PLAYER.isJumping = true;
+    PLAYER.isOnPlatform = false;
     createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y + PLAYER.height, '#FFD700', 12);
     
-    // Haptic feedback on mobile
+    GAME.isRunning = true;
+    
     if (navigator.vibrate) {
         navigator.vibrate(20);
     }
 }
 
-// Event listeners
 document.addEventListener('click', handleJump);
 document.addEventListener('touchstart', handleJump);
 
 // ==================== DRAWING FUNCTIONS ====================
 function drawBackground() {
-    // Sky gradient
     const gradient = CTX.createLinearGradient(0, 0, 0, GAME.height);
     gradient.addColorStop(0, '#87CEEB');
     gradient.addColorStop(1, '#E0F6FF');
     CTX.fillStyle = gradient;
     CTX.fillRect(0, 0, GAME.width, GAME.height);
 
-    // Floating clouds
     const time = Date.now() * 0.0001;
     drawCloud(100 + Math.sin(time) * 50, 80, 50);
     drawCloud(GAME.width - 150 + Math.cos(time * 0.7) * 40, 120, 40);
@@ -164,28 +181,37 @@ function drawCloud(x, y, size) {
 }
 
 function drawGround() {
-    // Grass
     CTX.fillStyle = '#00AA00';
     CTX.fillRect(0, GAME.height - 40, GAME.width, 40);
 
-    // Grass pattern
     CTX.fillStyle = 'rgba(0, 150, 0, 0.5)';
     for (let i = 0; i < GAME.width; i += 30) {
         CTX.fillRect(i, GAME.height - 40, 15, 40);
     }
 }
 
+function drawPlatform() {
+    const gradient = CTX.createLinearGradient(PLATFORM.x, PLATFORM.y, PLATFORM.x, PLATFORM.y + PLATFORM.height);
+    gradient.addColorStop(0, '#00FF00');
+    gradient.addColorStop(1, '#009900');
+    
+    CTX.fillStyle = gradient;
+    CTX.fillRect(PLATFORM.x, PLATFORM.y, PLATFORM.width, PLATFORM.height);
+    
+    CTX.strokeStyle = '#008800';
+    CTX.lineWidth = 2;
+    CTX.strokeRect(PLATFORM.x, PLATFORM.y, PLATFORM.width, PLATFORM.height);
+}
+
 function drawPlayer() {
     const x = PLAYER.x;
     const y = PLAYER.y;
 
-    // Shadow
     CTX.fillStyle = 'rgba(0, 0, 0, 0.1)';
     CTX.beginPath();
     CTX.ellipse(x + PLAYER.width / 2, GAME.height - 35, 25, 8, 0, 0, Math.PI * 2);
     CTX.fill();
 
-    // Body - golden circle with gradient
     const bodyGradient = CTX.createRadialGradient(x + 10, y + 10, 5, x + 20, y + 20, 30);
     bodyGradient.addColorStop(0, '#FFFF99');
     bodyGradient.addColorStop(1, '#FFD700');
@@ -194,36 +220,30 @@ function drawPlayer() {
     CTX.arc(x + PLAYER.width / 2, y + PLAYER.height / 2, PLAYER.width / 2, 0, Math.PI * 2);
     CTX.fill();
 
-    // Border
     CTX.strokeStyle = '#FFA500';
     CTX.lineWidth = 2;
     CTX.stroke();
 
-    // Left eye
     CTX.fillStyle = 'white';
     CTX.beginPath();
     CTX.arc(x + 12, y + 12, 6, 0, Math.PI * 2);
     CTX.fill();
 
-    // Left pupil
     CTX.fillStyle = PLAYER.eyeColor;
     CTX.beginPath();
     CTX.arc(x + 13, y + 13, 3, 0, Math.PI * 2);
     CTX.fill();
 
-    // Right eye
     CTX.fillStyle = 'white';
     CTX.beginPath();
     CTX.arc(x + 28, y + 12, 6, 0, Math.PI * 2);
     CTX.fill();
 
-    // Right pupil
     CTX.fillStyle = PLAYER.eyeColor;
     CTX.beginPath();
     CTX.arc(x + 29, y + 13, 3, 0, Math.PI * 2);
     CTX.fill();
 
-    // Mouth
     CTX.strokeStyle = PLAYER.eyeColor;
     CTX.lineWidth = 2;
     CTX.beginPath();
@@ -232,10 +252,9 @@ function drawPlayer() {
 }
 
 function drawObstacles() {
-    obstacles.forEach((obstacle, index) => {
+    obstacles.forEach((obstacle) => {
         const x = obstacle.x;
 
-        // Top obstacle
         const topGradient = CTX.createLinearGradient(x, 0, x + OBSTACLE_CONFIG.width, 0);
         topGradient.addColorStop(0, '#FF6666');
         topGradient.addColorStop(0.5, '#FF4444');
@@ -249,7 +268,6 @@ function drawObstacles() {
                      OBSTACLE_CONFIG.width, obstacle.topHeight);
         CTX.restore();
 
-        // Bottom obstacle
         CTX.save();
         CTX.translate(x + OBSTACLE_CONFIG.width / 2, obstacle.bottomY + (GAME.height - obstacle.bottomY) / 2);
         CTX.rotate(obstacle.rotation);
@@ -258,7 +276,6 @@ function drawObstacles() {
                      OBSTACLE_CONFIG.width, GAME.height - obstacle.bottomY);
         CTX.restore();
 
-        // Decorative spikes
         drawSpikes(x, obstacle.topHeight - 15, OBSTACLE_CONFIG.width, 15, false);
         drawSpikes(x, obstacle.bottomY, OBSTACLE_CONFIG.width, 15, true);
     });
@@ -291,9 +308,20 @@ function updatePlayer() {
         PLAYER.isJumping = false;
     }
 
+    // Platform collision
+    if (!GAME.isRunning && PLAYER.velocityY >= 0 &&
+        PLAYER.y + PLAYER.height >= PLATFORM.y &&
+        PLAYER.y + PLAYER.height <= PLATFORM.y + PLATFORM.height + 5 &&
+        PLAYER.x + PLAYER.width > PLATFORM.x &&
+        PLAYER.x < PLATFORM.x + PLATFORM.width) {
+        PLAYER.y = PLATFORM.y - PLAYER.height;
+        PLAYER.velocityY = 0;
+        PLAYER.isOnPlatform = true;
+    }
+
     // Ground collision
     if (PLAYER.y + PLAYER.height >= GAME.height - 40) {
-        endGame();
+        endLevel();
     }
 
     // Ceiling collision
@@ -305,10 +333,9 @@ function updatePlayer() {
 
 function updateObstacles() {
     obstacles.forEach((obstacle) => {
-        obstacle.x -= OBSTACLE_CONFIG.speed;
+        obstacle.x -= GAME.levelConfig.speed;
         obstacle.rotation += 0.01;
 
-        // Regenerate obstacle when off-screen
         if (obstacle.x + OBSTACLE_CONFIG.width < 0) {
             const lastObstacle = obstacles[obstacles.length - 1];
             const newObstacle = generateObstacle(lastObstacle.x + OBSTACLE_CONFIG.spacing);
@@ -316,14 +343,12 @@ function updateObstacles() {
             obstacles.push(newObstacle);
         }
 
-        // Score increment
         if (!obstacle.passed && obstacle.x + OBSTACLE_CONFIG.width < PLAYER.x) {
             obstacle.passed = true;
             GAME.score++;
             updateScore();
             createParticles(GAME.width / 2, 50, '#00FF00', 15);
             
-            // Haptic feedback
             if (navigator.vibrate) {
                 navigator.vibrate([50, 30, 50]);
             }
@@ -346,18 +371,15 @@ function checkCollisions() {
         const obstacleLeft = obstacle.x;
         const obstacleRight = obstacle.x + OBSTACLE_CONFIG.width;
 
-        // Check if player is in horizontal range of obstacle
         if (playerRight > obstacleLeft && playerLeft < obstacleRight) {
-            // Check collision with top obstacle
             if (playerTop < obstacle.topHeight) {
                 createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y, '#FF4444', 20);
-                endGame();
+                endLevel();
             }
 
-            // Check collision with bottom obstacle
             if (playerBottom > obstacle.bottomY) {
                 createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y + PLAYER.height, '#FF4444', 20);
-                endGame();
+                endLevel();
             }
         }
     });
@@ -368,21 +390,18 @@ function updateScore() {
     document.getElementById('scoreValue').textContent = GAME.score;
 }
 
-function endGame() {
+function endLevel() {
     GAME.isRunning = false;
     
-    // Update best score
     if (GAME.score > GAME.bestScore) {
         GAME.bestScore = GAME.score;
         localStorage.setItem('bestScore', GAME.bestScore);
     }
 
-    // Show game over screen
+    document.getElementById('finalLevel').textContent = GAME.currentLevel;
     document.getElementById('finalScore').textContent = GAME.score;
-    document.getElementById('bestScore').textContent = GAME.bestScore;
     document.getElementById('gameOver').style.display = 'block';
 
-    // Haptic feedback
     if (navigator.vibrate) {
         navigator.vibrate([100, 50, 100, 50, 200]);
     }
@@ -392,15 +411,59 @@ function updateBestScore() {
     document.getElementById('bestValue').textContent = GAME.bestScore;
 }
 
+// Global functions for menu
+window.nextLevel = function() {
+    if (GAME.currentLevel < 5) {
+        GAME.currentLevel++;
+    } else {
+        GAME.currentLevel = 1;
+    }
+    startNewLevel();
+};
+
+window.goToMenu = function() {
+    location.reload();
+};
+
+function startNewLevel() {
+    GAME.levelConfig = LEVEL_CONFIGS[GAME.currentLevel];
+    PLAYER.gravity = GAME.levelConfig.gravity;
+    PLATFORM.y = GAME.levelConfig.platformY;
+    
+    GAME.score = 0;
+    GAME.isRunning = false;
+    PLAYER.x = GAME.width / 2 - 20;
+    PLAYER.y = GAME.height - 150;
+    PLAYER.velocityY = 0;
+    PLAYER.isOnPlatform = true;
+    
+    obstacles = [];
+    particles = [];
+    
+    initializeObstacles();
+    updateScore();
+    document.getElementById('levelValue').textContent = GAME.currentLevel;
+    document.getElementById('gameOver').style.display = 'none';
+}
+
+function startGame() {
+    document.getElementById('mainMenu').style.display = 'none';
+    GAME.gameActive = true;
+    startNewLevel();
+}
+
 // ==================== MAIN GAME LOOP ====================
 function gameLoop() {
     drawBackground();
     drawGround();
+    drawPlatform();
 
-    if (GAME.isRunning) {
+    if (GAME.gameActive) {
         updatePlayer();
-        updateObstacles();
-        checkCollisions();
+        if (GAME.isRunning) {
+            updateObstacles();
+            checkCollisions();
+        }
     }
 
     updateParticles();
@@ -408,7 +471,6 @@ function gameLoop() {
     drawObstacles();
     drawPlayer();
 
-    // Draw particles
     particles.forEach(p => p.draw());
 
     requestAnimationFrame(gameLoop);
@@ -416,7 +478,6 @@ function gameLoop() {
 
 // ==================== INITIALIZATION ====================
 function init() {
-    // Handle window resize
     window.addEventListener('resize', () => {
         GAME.width = CANVAS.offsetWidth || 600;
         GAME.height = CANVAS.offsetHeight || 800;
@@ -424,10 +485,9 @@ function init() {
         CANVAS.height = GAME.height;
     });
 
-    initializeObstacles();
     updateBestScore();
+    document.getElementById('startButton').addEventListener('click', startGame);
     gameLoop();
 }
 
-// Start the game
 init();
