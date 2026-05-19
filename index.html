@@ -40,6 +40,58 @@
             height: 100%;
         }
 
+        /* Main Menu */
+        #mainMenu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            gap: 30px;
+        }
+
+        #mainMenu h1 {
+            font-size: 64px;
+            color: white;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+
+        #mainMenu p {
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: center;
+            max-width: 400px;
+        }
+
+        #startButton {
+            padding: 20px 50px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            color: #333;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s;
+        }
+
+        #startButton:active {
+            transform: scale(0.95);
+        }
+
+        #startButton:hover {
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        /* UI */
         #ui {
             position: absolute;
             top: 20px;
@@ -56,12 +108,24 @@
             background: rgba(255, 255, 255, 0.9);
             padding: 12px 20px;
             border-radius: 15px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             color: #764ba2;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
+        .level-box {
+            background: rgba(255, 215, 0, 0.95);
+            padding: 12px 20px;
+            border-radius: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        /* Game Over */
         #gameOver {
             position: absolute;
             top: 50%;
@@ -84,15 +148,16 @@
         }
 
         #gameOver p {
-            font-size: 24px;
+            font-size: 22px;
             margin: 10px 0;
             color: #fff;
         }
 
         #gameOver button {
-            margin-top: 30px;
-            padding: 15px 40px;
-            font-size: 18px;
+            margin-top: 20px;
+            margin-right: 10px;
+            padding: 12px 30px;
+            font-size: 16px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
@@ -112,9 +177,9 @@
             left: 50%;
             transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.85);
-            padding: 15px 25px;
+            padding: 12px 20px;
             border-radius: 15px;
-            font-size: 14px;
+            font-size: 13px;
             color: #333;
             text-align: center;
             z-index: 10;
@@ -131,19 +196,32 @@
 </head>
 <body>
     <div id="gameContainer">
+        <!-- Main Menu -->
+        <div id="mainMenu">
+            <h1>🎮 Bounce Quest</h1>
+            <p>Jump through the obstacles and reach new levels!</p>
+            <p>Each level gets harder and faster 🚀</p>
+            <button id="startButton">START GAME</button>
+        </div>
+
         <canvas id="gameCanvas"></canvas>
+        
         <div id="ui">
             <div class="score-box">Score: <span id="scoreValue">0</span></div>
+            <div class="level-box">Level <span id="levelValue">1</span></div>
             <div class="score-box">Best: <span id="bestValue">0</span></div>
         </div>
+
         <div id="gameOver">
-            <h1>GAME OVER!</h1>
-            <p>Final Score: <span id="finalScore">0</span></p>
-            <p>Best Score: <span id="bestScore">0</span></p>
-            <button onclick="location.reload()">Play Again</button>
+            <h1>LEVEL COMPLETE! 🎉</h1>
+            <p>Level: <span id="finalLevel">1</span></p>
+            <p>Score: <span id="finalScore">0</span></p>
+            <button onclick="nextLevel()">Next Level →</button>
+            <button onclick="goToMenu()">Main Menu</button>
         </div>
+
         <div class="instruction">
-            👆 Tap or Click to Jump | 🎮 Avoid Red Obstacles
+            👆 Tap or Click to Jump | Avoid Red Obstacles
         </div>
     </div>
 
