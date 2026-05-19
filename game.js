@@ -4,11 +4,11 @@ const CTX = CANVAS.getContext('2d');
 
 // Level configurations
 const LEVEL_CONFIGS = {
-    1: { speed: 2.5, minGap: 140, maxGap: 180, gravity: 0.5, obstacleCount: 5, platformY: 700 },
-    2: { speed: 3.2, minGap: 130, maxGap: 170, gravity: 0.55, obstacleCount: 6, platformY: 680 },
-    3: { speed: 3.9, minGap: 120, maxGap: 160, gravity: 0.6, obstacleCount: 7, platformY: 660 },
-    4: { speed: 4.6, minGap: 110, maxGap: 150, gravity: 0.65, obstacleCount: 8, platformY: 640 },
-    5: { speed: 5.3, minGap: 100, maxGap: 140, gravity: 0.7, obstacleCount: 9, platformY: 620 }
+    1: { speed: 2.5, minGap: 140, maxGap: 180, gravity: 0.5, obstacleCount: 5, platformY: 650 },
+    2: { speed: 3.2, minGap: 130, maxGap: 170, gravity: 0.55, obstacleCount: 6, platformY: 650 },
+    3: { speed: 3.9, minGap: 120, maxGap: 160, gravity: 0.6, obstacleCount: 7, platformY: 650 },
+    4: { speed: 4.6, minGap: 110, maxGap: 150, gravity: 0.65, obstacleCount: 8, platformY: 650 },
+    5: { speed: 5.3, minGap: 100, maxGap: 140, gravity: 0.7, obstacleCount: 9, platformY: 650 }
 };
 
 // Game state
@@ -27,10 +27,19 @@ const GAME = {
 CANVAS.width = GAME.width;
 CANVAS.height = GAME.height;
 
+// Platform object - MUST be defined before PLAYER
+const PLATFORM = {
+    x: GAME.width / 2 - 60,
+    y: 650,
+    width: 120,
+    height: 20,
+    color: '#00CC00'
+};
+
 // Player object
 const PLAYER = {
     x: GAME.width / 2 - 20,
-    y: GAME.height - 150,
+    y: PLATFORM.y - 40,
     width: 40,
     height: 40,
     velocityY: 0,
@@ -39,16 +48,7 @@ const PLAYER = {
     color: '#FFD700',
     eyeColor: '#333',
     isJumping: false,
-    isOnPlatform: false
-};
-
-// Platform object
-const PLATFORM = {
-    x: GAME.width / 2 - 60,
-    y: 700,
-    width: 120,
-    height: 15,
-    color: '#00CC00'
+    isOnPlatform: true
 };
 
 // Obstacles array
@@ -191,27 +191,41 @@ function drawGround() {
 }
 
 function drawPlatform() {
+    // Shadow
+    CTX.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    CTX.fillRect(PLATFORM.x - 5, PLATFORM.y + PLATFORM.height + 3, PLATFORM.width + 10, 8);
+
+    // Main platform with gradient
     const gradient = CTX.createLinearGradient(PLATFORM.x, PLATFORM.y, PLATFORM.x, PLATFORM.y + PLATFORM.height);
     gradient.addColorStop(0, '#00FF00');
+    gradient.addColorStop(0.5, '#00DD00');
     gradient.addColorStop(1, '#009900');
     
     CTX.fillStyle = gradient;
     CTX.fillRect(PLATFORM.x, PLATFORM.y, PLATFORM.width, PLATFORM.height);
     
-    CTX.strokeStyle = '#008800';
-    CTX.lineWidth = 2;
+    // Border
+    CTX.strokeStyle = '#006600';
+    CTX.lineWidth = 3;
     CTX.strokeRect(PLATFORM.x, PLATFORM.y, PLATFORM.width, PLATFORM.height);
+
+    // Highlight
+    CTX.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    CTX.lineWidth = 1;
+    CTX.strokeRect(PLATFORM.x + 2, PLATFORM.y + 2, PLATFORM.width - 4, PLATFORM.height - 4);
 }
 
 function drawPlayer() {
     const x = PLAYER.x;
     const y = PLAYER.y;
 
+    // Shadow
     CTX.fillStyle = 'rgba(0, 0, 0, 0.1)';
     CTX.beginPath();
-    CTX.ellipse(x + PLAYER.width / 2, GAME.height - 35, 25, 8, 0, 0, Math.PI * 2);
+    CTX.ellipse(x + PLAYER.width / 2, PLATFORM.y + PLATFORM.height + 5, 25, 8, 0, 0, Math.PI * 2);
     CTX.fill();
 
+    // Body - golden circle with gradient
     const bodyGradient = CTX.createRadialGradient(x + 10, y + 10, 5, x + 20, y + 20, 30);
     bodyGradient.addColorStop(0, '#FFFF99');
     bodyGradient.addColorStop(1, '#FFD700');
@@ -220,30 +234,36 @@ function drawPlayer() {
     CTX.arc(x + PLAYER.width / 2, y + PLAYER.height / 2, PLAYER.width / 2, 0, Math.PI * 2);
     CTX.fill();
 
+    // Border
     CTX.strokeStyle = '#FFA500';
     CTX.lineWidth = 2;
     CTX.stroke();
 
+    // Left eye
     CTX.fillStyle = 'white';
     CTX.beginPath();
     CTX.arc(x + 12, y + 12, 6, 0, Math.PI * 2);
     CTX.fill();
 
+    // Left pupil
     CTX.fillStyle = PLAYER.eyeColor;
     CTX.beginPath();
     CTX.arc(x + 13, y + 13, 3, 0, Math.PI * 2);
     CTX.fill();
 
+    // Right eye
     CTX.fillStyle = 'white';
     CTX.beginPath();
     CTX.arc(x + 28, y + 12, 6, 0, Math.PI * 2);
     CTX.fill();
 
+    // Right pupil
     CTX.fillStyle = PLAYER.eyeColor;
     CTX.beginPath();
     CTX.arc(x + 29, y + 13, 3, 0, Math.PI * 2);
     CTX.fill();
 
+    // Mouth
     CTX.strokeStyle = PLAYER.eyeColor;
     CTX.lineWidth = 2;
     CTX.beginPath();
@@ -301,22 +321,29 @@ function drawSpikes(x, y, width, height, isDown) {
 
 // ==================== UPDATE FUNCTIONS ====================
 function updatePlayer() {
-    PLAYER.velocityY += PLAYER.gravity;
-    PLAYER.y += PLAYER.velocityY;
+    // Only apply gravity if not on platform
+    if (!PLAYER.isOnPlatform) {
+        PLAYER.velocityY += PLAYER.gravity;
+        PLAYER.y += PLAYER.velocityY;
+    }
 
     if (PLAYER.isJumping && PLAYER.velocityY > 0) {
         PLAYER.isJumping = false;
     }
 
-    // Platform collision
-    if (!GAME.isRunning && PLAYER.velocityY >= 0 &&
-        PLAYER.y + PLAYER.height >= PLATFORM.y &&
-        PLAYER.y + PLAYER.height <= PLATFORM.y + PLATFORM.height + 5 &&
-        PLAYER.x + PLAYER.width > PLATFORM.x &&
-        PLAYER.x < PLATFORM.x + PLATFORM.width) {
-        PLAYER.y = PLATFORM.y - PLAYER.height;
-        PLAYER.velocityY = 0;
-        PLAYER.isOnPlatform = true;
+    // Platform collision - check if ball is falling onto platform
+    if (PLAYER.velocityY >= 0 && !GAME.isRunning) {
+        const playerBottom = PLAYER.y + PLAYER.height;
+        const platformTop = PLATFORM.y;
+        const playerCenterX = PLAYER.x + PLAYER.width / 2;
+        
+        // Check if player is above platform and falling down onto it
+        if (playerBottom >= platformTop && playerBottom <= platformTop + 15 &&
+            playerCenterX > PLATFORM.x - 20 && playerCenterX < PLATFORM.x + PLATFORM.width + 20) {
+            PLAYER.y = PLATFORM.y - PLAYER.height;
+            PLAYER.velocityY = 0;
+            PLAYER.isOnPlatform = true;
+        }
     }
 
     // Ground collision
@@ -433,9 +460,10 @@ function startNewLevel() {
     GAME.score = 0;
     GAME.isRunning = false;
     PLAYER.x = GAME.width / 2 - 20;
-    PLAYER.y = GAME.height - 150;
+    PLAYER.y = PLATFORM.y - PLAYER.height;
     PLAYER.velocityY = 0;
     PLAYER.isOnPlatform = true;
+    PLAYER.isJumping = false;
     
     obstacles = [];
     particles = [];
