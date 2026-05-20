@@ -4,11 +4,11 @@ const CTX = CANVAS.getContext('2d');
 
 // Level configurations
 const LEVEL_CONFIGS = {
-    1: { speed: 2.5, minGap: 140, maxGap: 180, gravity: 0.5, platformY: 650 },
-    2: { speed: 3.2, minGap: 130, maxGap: 170, gravity: 0.55, platformY: 650 },
-    3: { speed: 3.9, minGap: 120, maxGap: 160, gravity: 0.6, platformY: 650 },
-    4: { speed: 4.6, minGap: 110, maxGap: 150, gravity: 0.65, platformY: 650 },
-    5: { speed: 5.3, minGap: 100, maxGap: 140, gravity: 0.7, platformY: 650 }
+    1: { speed: 3, minGap: 80, maxGap: 100, gravity: 0.8, platformY: 650 },
+    2: { speed: 3.5, minGap: 70, maxGap: 90, gravity: 0.85, platformY: 650 },
+    3: { speed: 4, minGap: 60, maxGap: 80, gravity: 0.9, platformY: 650 },
+    4: { speed: 4.5, minGap: 50, maxGap: 70, gravity: 0.95, platformY: 650 },
+    5: { speed: 5, minGap: 40, maxGap: 60, gravity: 1, platformY: 650 }
 };
 
 // Game state
@@ -43,20 +43,22 @@ const PLAYER = {
     width: 40,
     height: 40,
     velocityY: 0,
-    gravity: 0.5,
-    jumpPower: -12,
+    gravity: 0.8,
+    jumpPower: -15,
     color: '#FFD700',
     eyeColor: '#333',
     isJumping: false,
-    isOnPlatform: true
+    isOnPlatform: true,
+    onGround: true
 };
 
 // Obstacles array
 let obstacles = [];
 let platforms = [];
 const OBSTACLE_CONFIG = {
-    width: 80,
-    spacing: 300,
+    width: 60,
+    height: 30,
+    spacing: 280,
     color: '#FF4444'
 };
 
@@ -110,10 +112,10 @@ function createParticles(x, y, color, count = 8) {
 function generatePlatform(xPosition) {
     return {
         x: xPosition,
-        y: 400 + Math.random() * 150,
+        y: 550,
         width: 120,
         height: 20,
-        color: '#00CC00'
+        color: '#0099FF'
     };
 }
 
@@ -121,15 +123,13 @@ function generatePlatform(xPosition) {
 function generateObstacle(startX) {
     const minGap = GAME.levelConfig.minGap;
     const maxGap = GAME.levelConfig.maxGap;
-    const gapSize = minGap + Math.random() * (maxGap - minGap);
-    const topHeight = Math.random() * (GAME.height - gapSize - 120) + 80;
-    const bottomY = topHeight + gapSize;
+    const randomHeight = minGap + Math.random() * (maxGap - minGap);
 
     return {
         x: startX,
-        topHeight: topHeight,
-        bottomY: bottomY,
-        gapSize: gapSize,
+        y: 680 - randomHeight,
+        width: OBSTACLE_CONFIG.width,
+        height: randomHeight,
         passed: false,
         rotation: 0
     };
@@ -140,13 +140,13 @@ function initializeObstacles() {
     platforms = [];
     obstaclesPassed = 0;
     
-    // Create obstacles and platforms
-    for (let i = 0; i < 15; i++) {
+    // Create obstacles and checkpoint platforms
+    for (let i = 0; i < 20; i++) {
         obstacles.push(generateObstacle(GAME.width + i * OBSTACLE_CONFIG.spacing));
         
-        // Add platform after every 5 obstacles
+        // Add checkpoint platform after every 5 obstacles
         if ((i + 1) % 5 === 0) {
-            const platformX = GAME.width + i * OBSTACLE_CONFIG.spacing + 200;
+            const platformX = GAME.width + (i + 1) * OBSTACLE_CONFIG.spacing + 100;
             platforms.push(generatePlatform(platformX));
         }
     }
@@ -155,21 +155,27 @@ function initializeObstacles() {
 // ==================== INPUT HANDLING ====================
 function handleJump(e) {
     if (!GAME.gameActive) return;
-    if (!GAME.isRunning && !PLAYER.isOnPlatform) return;
+    if (GAME.isRunning && !PLAYER.onGround) return;
     
     if (e.type.includes('touch')) {
         e.preventDefault();
     }
 
-    PLAYER.velocityY = PLAYER.jumpPower;
-    PLAYER.isJumping = true;
-    PLAYER.isOnPlatform = false;
-    createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y + PLAYER.height, '#FFD700', 12);
-    
-    GAME.isRunning = true;
-    
-    if (navigator.vibrate) {
-        navigator.vibrate(20);
+    if (!GAME.isRunning) {
+        GAME.isRunning = true;
+    }
+
+    // Only allow jump if on ground or platform
+    if (PLAYER.onGround || PLAYER.isOnPlatform) {
+        PLAYER.velocityY = PLAYER.jumpPower;
+        PLAYER.isJumping = true;
+        PLAYER.onGround = false;
+        PLAYER.isOnPlatform = false;
+        createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y + PLAYER.height, '#FFD700', 12);
+        
+        if (navigator.vibrate) {
+            navigator.vibrate(20);
+        }
     }
 }
 
@@ -204,12 +210,13 @@ function drawCloud(x, y, size) {
 }
 
 function drawGround() {
-    CTX.fillStyle = '#00AA00';
+    CTX.fillStyle = '#8B7355';
     CTX.fillRect(0, GAME.height - 40, GAME.width, 40);
 
-    CTX.fillStyle = 'rgba(0, 150, 0, 0.5)';
-    for (let i = 0; i < GAME.width; i += 30) {
-        CTX.fillRect(i, GAME.height - 40, 15, 40);
+    // Ground pattern
+    CTX.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    for (let i = 0; i < GAME.width; i += 40) {
+        CTX.fillRect(i, GAME.height - 40, 20, 40);
     }
 }
 
@@ -236,15 +243,21 @@ function drawStartPlatform() {
     CTX.strokeStyle = 'rgba(255, 255, 255, 0.5)';
     CTX.lineWidth = 1;
     CTX.strokeRect(PLATFORM.x + 2, PLATFORM.y + 2, PLATFORM.width - 4, PLATFORM.height - 4);
+
+    // Start text
+    CTX.fillStyle = 'white';
+    CTX.font = 'bold 14px Arial';
+    CTX.textAlign = 'center';
+    CTX.fillText('START', PLATFORM.x + PLATFORM.width / 2, PLATFORM.y + 35);
 }
 
-function drawPlatforms() {
+function drawCheckpoints() {
     platforms.forEach((platform) => {
         // Shadow
         CTX.fillStyle = 'rgba(0, 0, 0, 0.2)';
         CTX.fillRect(platform.x - 5, platform.y + platform.height + 3, platform.width + 10, 8);
 
-        // Main platform with blue gradient (checkpoint)
+        // Main platform with blue gradient
         const gradient = CTX.createLinearGradient(platform.x, platform.y, platform.x, platform.y + platform.height);
         gradient.addColorStop(0, '#00DDFF');
         gradient.addColorStop(0.5, '#00AADD');
@@ -264,8 +277,8 @@ function drawPlatforms() {
         CTX.strokeRect(platform.x + 2, platform.y + 2, platform.width - 4, platform.height - 4);
 
         // Checkpoint label
-        CTX.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        CTX.font = 'bold 12px Arial';
+        CTX.fillStyle = 'white';
+        CTX.font = 'bold 10px Arial';
         CTX.textAlign = 'center';
         CTX.fillText('CHECKPOINT', platform.x + platform.width / 2, platform.y + platform.height + 16);
     });
@@ -275,10 +288,10 @@ function drawPlayer() {
     const x = PLAYER.x;
     const y = PLAYER.y;
 
-    // Shadow
-    CTX.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    // Shadow on ground
+    CTX.fillStyle = 'rgba(0, 0, 0, 0.2)';
     CTX.beginPath();
-    CTX.ellipse(x + PLAYER.width / 2, PLATFORM.y + PLATFORM.height + 5, 25, 8, 0, 0, Math.PI * 2);
+    CTX.ellipse(x + PLAYER.width / 2, 690, 25, 6, 0, 0, Math.PI * 2);
     CTX.fill();
 
     // Body - golden circle with gradient
@@ -330,74 +343,76 @@ function drawPlayer() {
 function drawObstacles() {
     obstacles.forEach((obstacle) => {
         const x = obstacle.x;
+        const y = obstacle.y;
+        const h = obstacle.height;
 
-        const topGradient = CTX.createLinearGradient(x, 0, x + OBSTACLE_CONFIG.width, 0);
-        topGradient.addColorStop(0, '#FF6666');
-        topGradient.addColorStop(0.5, '#FF4444');
-        topGradient.addColorStop(1, '#FF2222');
+        // Obstacle gradient
+        const gradient = CTX.createLinearGradient(x, y, x, y + h);
+        gradient.addColorStop(0, '#FF6666');
+        gradient.addColorStop(0.5, '#FF4444');
+        gradient.addColorStop(1, '#CC0000');
 
-        CTX.save();
-        CTX.translate(x + OBSTACLE_CONFIG.width / 2, obstacle.topHeight / 2);
-        CTX.rotate(obstacle.rotation);
-        CTX.fillStyle = topGradient;
-        CTX.fillRect(-OBSTACLE_CONFIG.width / 2, -obstacle.topHeight / 2, 
-                     OBSTACLE_CONFIG.width, obstacle.topHeight);
-        CTX.restore();
+        // Draw obstacle rectangle
+        CTX.fillStyle = gradient;
+        CTX.fillRect(x, y, obstacle.width, h);
+        
+        // Border
+        CTX.strokeStyle = '#990000';
+        CTX.lineWidth = 2;
+        CTX.strokeRect(x, y, obstacle.width, h);
 
-        CTX.save();
-        CTX.translate(x + OBSTACLE_CONFIG.width / 2, obstacle.bottomY + (GAME.height - obstacle.bottomY) / 2);
-        CTX.rotate(obstacle.rotation);
-        CTX.fillStyle = topGradient;
-        CTX.fillRect(-OBSTACLE_CONFIG.width / 2, -(GAME.height - obstacle.bottomY) / 2, 
-                     OBSTACLE_CONFIG.width, GAME.height - obstacle.bottomY);
-        CTX.restore();
-
-        drawSpikes(x, obstacle.topHeight - 15, OBSTACLE_CONFIG.width, 15, false);
-        drawSpikes(x, obstacle.bottomY, OBSTACLE_CONFIG.width, 15, true);
+        // Spikes on top
+        drawObstacleSpikes(x, y, obstacle.width);
     });
 }
 
-function drawSpikes(x, y, width, height, isDown) {
-    CTX.fillStyle = isDown ? '#DD0000' : '#FF7777';
-    for (let i = 0; i < 8; i++) {
-        const spikeX = x + (width / 8) * i + width / 16;
+function drawObstacleSpikes(x, y, width) {
+    CTX.fillStyle = '#FF2222';
+    const spikeCount = Math.floor(width / 12);
+    for (let i = 0; i < spikeCount; i++) {
+        const spikeX = x + (width / spikeCount) * i + (width / spikeCount) / 2;
         CTX.beginPath();
-        if (isDown) {
-            CTX.moveTo(spikeX - 5, y);
-            CTX.lineTo(spikeX, y + height);
-            CTX.lineTo(spikeX + 5, y);
-        } else {
-            CTX.moveTo(spikeX - 5, y + height);
-            CTX.lineTo(spikeX, y);
-            CTX.lineTo(spikeX + 5, y + height);
-        }
+        CTX.moveTo(spikeX - 4, y);
+        CTX.lineTo(spikeX, y - 8);
+        CTX.lineTo(spikeX + 4, y);
         CTX.fill();
     }
 }
 
 // ==================== UPDATE FUNCTIONS ====================
 function updatePlayer() {
-    // Only apply gravity if not on platform
-    if (!PLAYER.isOnPlatform) {
-        PLAYER.velocityY += PLAYER.gravity;
-        PLAYER.y += PLAYER.velocityY;
-    }
+    // Apply gravity
+    PLAYER.velocityY += PLAYER.gravity;
+    PLAYER.y += PLAYER.velocityY;
 
+    // Check if falling - not on platform anymore
     if (PLAYER.isJumping && PLAYER.velocityY > 0) {
         PLAYER.isJumping = false;
     }
 
+    // Ground collision
+    if (PLAYER.y + PLAYER.height >= 680) {
+        PLAYER.y = 680 - PLAYER.height;
+        PLAYER.velocityY = 0;
+        PLAYER.onGround = true;
+        PLAYER.isOnPlatform = false;
+    } else {
+        PLAYER.onGround = false;
+    }
+
     // Start platform collision
-    if (PLAYER.velocityY >= 0 && !GAME.isRunning) {
+    if (PLAYER.velocityY >= 0) {
         const playerBottom = PLAYER.y + PLAYER.height;
         const platformTop = PLATFORM.y;
         const playerCenterX = PLAYER.x + PLAYER.width / 2;
         
-        if (playerBottom >= platformTop && playerBottom <= platformTop + 15 &&
-            playerCenterX > PLATFORM.x - 20 && playerCenterX < PLATFORM.x + PLATFORM.width + 20) {
+        if (playerBottom >= platformTop && playerBottom <= platformTop + 20 &&
+            playerCenterX > PLATFORM.x - 20 && playerCenterX < PLATFORM.x + PLATFORM.width + 20 &&
+            !PLAYER.isOnPlatform) {
             PLAYER.y = PLATFORM.y - PLAYER.height;
             PLAYER.velocityY = 0;
             PLAYER.isOnPlatform = true;
+            PLAYER.onGround = false;
         }
     }
 
@@ -408,11 +423,13 @@ function updatePlayer() {
             const platformTop = platform.y;
             const playerCenterX = PLAYER.x + PLAYER.width / 2;
             
-            if (playerBottom >= platformTop && playerBottom <= platformTop + 15 &&
-                playerCenterX > platform.x - 20 && playerCenterX < platform.x + platform.width + 20) {
+            if (playerBottom >= platformTop && playerBottom <= platformTop + 20 &&
+                playerCenterX > platform.x - 20 && playerCenterX < platform.x + platform.width + 20 &&
+                !PLAYER.isOnPlatform) {
                 PLAYER.y = platform.y - PLAYER.height;
                 PLAYER.velocityY = 0;
                 PLAYER.isOnPlatform = true;
+                PLAYER.onGround = false;
                 createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y, '#00DDFF', 15);
                 if (navigator.vibrate) {
                     navigator.vibrate([30, 20, 30]);
@@ -420,11 +437,6 @@ function updatePlayer() {
             }
         }
     });
-
-    // Ground collision
-    if (PLAYER.y + PLAYER.height >= GAME.height - 40) {
-        endLevel();
-    }
 
     // Ceiling collision
     if (PLAYER.y <= 0) {
@@ -436,21 +448,19 @@ function updatePlayer() {
 function updateObstacles() {
     obstacles.forEach((obstacle) => {
         obstacle.x -= GAME.levelConfig.speed;
-        obstacle.rotation += 0.01;
 
-        if (obstacle.x + OBSTACLE_CONFIG.width < 0) {
+        if (obstacle.x + obstacle.width < 0) {
             const lastObstacle = obstacles[obstacles.length - 1];
             const newObstacle = generateObstacle(lastObstacle.x + OBSTACLE_CONFIG.spacing);
             obstacles.push(newObstacle);
             obstacles.shift();
         }
 
-        if (!obstacle.passed && obstacle.x + OBSTACLE_CONFIG.width < PLAYER.x) {
+        if (!obstacle.passed && obstacle.x + obstacle.width < PLAYER.x) {
             obstacle.passed = true;
             GAME.score++;
-            obstaclesPassed++;
             updateScore();
-            createParticles(GAME.width / 2, 50, '#00FF00', 15);
+            createParticles(GAME.width / 2, 100, '#00FF00', 15);
             
             if (navigator.vibrate) {
                 navigator.vibrate([50, 30, 50]);
@@ -460,6 +470,7 @@ function updateObstacles() {
 }
 
 function updatePlatforms() {
+    // Remove platforms that are off screen
     platforms = platforms.filter(p => p.x > -150);
 }
 
@@ -476,18 +487,15 @@ function checkCollisions() {
         const playerBottom = PLAYER.y + PLAYER.height;
 
         const obstacleLeft = obstacle.x;
-        const obstacleRight = obstacle.x + OBSTACLE_CONFIG.width;
+        const obstacleRight = obstacle.x + obstacle.width;
+        const obstacleTop = obstacle.y;
+        const obstacleBottom = obstacle.y + obstacle.height;
 
-        if (playerRight > obstacleLeft && playerLeft < obstacleRight) {
-            if (playerTop < obstacle.topHeight) {
-                createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y, '#FF4444', 20);
-                endLevel();
-            }
-
-            if (playerBottom > obstacle.bottomY) {
-                createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y + PLAYER.height, '#FF4444', 20);
-                endLevel();
-            }
+        // Check if player overlaps with obstacle
+        if (playerRight > obstacleLeft && playerLeft < obstacleRight &&
+            playerBottom > obstacleTop && playerTop < obstacleBottom) {
+            createParticles(PLAYER.x + PLAYER.width / 2, PLAYER.y, '#FF4444', 20);
+            endLevel();
         }
     });
 }
@@ -542,6 +550,7 @@ function startNewLevel() {
     PLAYER.y = PLATFORM.y - PLAYER.height;
     PLAYER.velocityY = 0;
     PLAYER.isOnPlatform = true;
+    PLAYER.onGround = false;
     PLAYER.isJumping = false;
     
     obstacles = [];
@@ -565,7 +574,7 @@ function gameLoop() {
     drawBackground();
     drawGround();
     drawStartPlatform();
-    drawPlatforms();
+    drawCheckpoints();
 
     if (GAME.gameActive) {
         updatePlayer();
